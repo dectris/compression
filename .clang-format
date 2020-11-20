@@ -1,0 +1,6 @@
+BasedOnStyle: Chromium
+AlwaysBreakBeforeMultilineStrings: false
+BraceWrapping:
+  AfterControlStatement: MultiLine
+BreakBeforeBraces: Custom
+IndentWidth: 4

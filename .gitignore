@@ -1,0 +1,11 @@
+*.pyd
+*.so
+.*.swp
+.*.un~
+.DS_Store
+.tox/
+/bazel-*
+/build/
+/dist/
+/python/dectris_compression.egg-info/
+__pycache__/

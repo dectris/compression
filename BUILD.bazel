@@ -1,0 +1,49 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+COPTS = select({
+    "@bazel_tools//platforms:windows": [
+        "/W4",
+        "/WX",
+    ],
+    "//conditions:default": [
+        "-Wall",
+        "-Wextra",
+        "-Wundef",
+        "-Werror",
+    ],
+})
+
+cc_library(
+    name = "compression",
+    srcs = [
+        "src/compression.c",
+    ],
+    hdrs = [
+        "src/compression.h",
+    ],
+    copts = COPTS + [
+        "-Iexternal",
+    ],
+    deps = [
+        "@bitshuffle//:bitshuffle_core",
+        "@lz4",
+    ],
+)
+
+cc_test(
+    name = "compression_test",
+    srcs = [
+        "src/compression_test.cc",
+    ],
+    copts = COPTS + select({
+        "@bazel_tools//platforms:windows": [],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    deps = [
+        ":compression",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+)

@@ -1,0 +1,9 @@
+include LICENSE
+include README.md
+include src/compression.h
+include third_party/bitshuffle/LICENSE
+include third_party/bitshuffle/src/bitshuffle_core.h
+include third_party/bitshuffle/src/bitshuffle_internals.h
+include third_party/bitshuffle/src/iochain.h
+include third_party/lz4/LICENSE
+include third_party/lz4/lib/lz4.h
