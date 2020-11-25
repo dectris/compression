@@ -3,7 +3,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 COPTS = select({
-    "@bazel_tools//platforms:windows": [
+    "@platforms//os:windows": [
         "/W4",
         "/WX",
     ],
@@ -38,7 +38,7 @@ cc_test(
         "src/compression_test.cc",
     ],
     copts = COPTS + select({
-        "@bazel_tools//platforms:windows": [],
+        "@platforms//os:windows": [],
         "//conditions:default": ["-std=c++14"],
     }),
     deps = [
