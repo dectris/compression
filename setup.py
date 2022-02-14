@@ -1,4 +1,14 @@
 from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
+
+
+class BuildExt(build_ext):
+    def build_extensions(self):
+        if self.compiler.compiler_type != "msvc":
+            for ext in self.extensions:
+                ext.extra_compile_args.append("-std=c99")
+        build_ext.build_extensions(self)
+
 
 setup(
     name="dectris-compression",
@@ -24,9 +34,9 @@ setup(
                 "third_party",
                 "third_party/lz4/lib",
             ],
-            extra_compile_args=["-std=c99"],
         )
     ],
+    cmdclass={"build_ext": BuildExt},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
