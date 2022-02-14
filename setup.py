@@ -1,5 +1,8 @@
+from pathlib import Path
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
+
+long_description = (Path(__file__).parent / "README.md").read_text()
 
 
 class BuildExt(build_ext):
@@ -14,11 +17,13 @@ setup(
     name="dectris-compression",
     version="0.0.0",
     description="DECTRIS compression algorithms",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="Kal Conley",
     author_email="kal.conley@dectris.com",
+    url="https://github.com/dectris/compression",
     package_dir={"": "python"},
     packages=["dectris"],
-    url="https://github.com/dectris/compression",
     ext_modules=[
         Extension(
             name="dectris.compression",
