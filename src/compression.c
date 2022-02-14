@@ -1,4 +1,3 @@
-#define _DEFAULT_SOURCE
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
 #define be32toh(x) OSSwapBigToHostInt32(x)
@@ -10,6 +9,8 @@
 #define be64toh(x) ntohll(x)
 #pragma comment(lib, "ws2_32.lib")
 #else
+#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #include <endian.h>
 #endif
 #include <limits.h>
