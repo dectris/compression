@@ -16,8 +16,9 @@ static bool check_decompress_buffer(CompressionAlgorithm algorithm,
                                       encoded.size(),
                                       elem_size) != expected.size())
         return false;
-    auto buffer = std::make_unique<char[]>(expected.size());
-    if (compression_decompress_buffer(algorithm, buffer.get(), expected.size(),
+    const size_t buffer_size = expected.size() > 0 ? expected.size() : 1;
+    auto buffer = std::make_unique<char[]>(buffer_size);
+    if (compression_decompress_buffer(algorithm, buffer.get(), buffer_size,
                                       encoded.data(), encoded.size(),
                                       elem_size) != expected.size())
         return false;

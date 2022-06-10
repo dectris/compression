@@ -105,6 +105,9 @@ static size_t decompress_buffer_bslz4_hdf5(char* dst,
         return COMPRESSION_ERROR;
     }
 
+    if (orig_size == 0)
+        return (size_t)0;
+
     const int leftover_bytes =
         orig_size % (int)(BSHUF_BLOCKED_MULT * elem_size);
     const uint64_t full_block_count = orig_size / block_size;
@@ -183,6 +186,9 @@ static size_t decompress_buffer_lz4_hdf5(char* dst,
     {
         return COMPRESSION_ERROR;
     }
+
+    if (orig_size == 0)
+        return (size_t)0;
 
     const uint64_t full_block_count = orig_size / block_size;
     const uint32_t last_block_size = orig_size % block_size;
