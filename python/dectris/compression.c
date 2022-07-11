@@ -5,10 +5,10 @@
 
 static int parse_algorithm(const char* identifier,
                            CompressionAlgorithm* algorithm) {
-    if (strcmp(identifier, "bslz4-h5") == 0) {
+    if (strcmp(identifier, "bslz4") == 0) {
         *algorithm = COMPRESSION_BSLZ4_HDF5;
         return 1;
-    } else if (strcmp(identifier, "lz4-h5") == 0) {
+    } else if (strcmp(identifier, "lz4") == 0) {
         *algorithm = COMPRESSION_LZ4_HDF5;
         return 1;
     }
