@@ -88,7 +88,6 @@ static size_t decompress_buffer_bslz4_hdf5(char* dst,
     if (elem_size == 0 || elem_size > UINT32_MAX / BSHUF_BLOCKED_MULT)
         return COMPRESSION_ERROR;
 
-    const char* const dst_end = dst + dst_size;
     const char* const src_end = src + src_size;
     uint64_t orig_size;
     uint32_t block_size;
@@ -108,14 +107,15 @@ static size_t decompress_buffer_bslz4_hdf5(char* dst,
     if (orig_size == 0)
         return 0;
 
+    char* tmp_buf = malloc(block_size);
+    if (!tmp_buf)
+        return COMPRESSION_ERROR;
+
+    const char* const dst_end = dst + dst_size;
     const int leftover_bytes =
         orig_size % (int)(BSHUF_BLOCKED_MULT * elem_size);
     const uint64_t full_block_count = orig_size / block_size;
     const uint32_t last_block_size = (orig_size % block_size) - leftover_bytes;
-
-    char* tmp_buf = malloc(block_size);
-    if (!tmp_buf)
-        return COMPRESSION_ERROR;
 
     for (uint64_t block = 0; block < full_block_count; ++block) {
         if (!decompress_bslz4_block(&dst, &src, src_end, tmp_buf, block_size,
