@@ -6,7 +6,7 @@ jobs:
   bazel-posix:
     strategy:
       matrix:
-        os: [macos-10.15, macos-11.0, ubuntu-18.04, ubuntu-20.04]
+        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -29,7 +29,7 @@ jobs:
   bazel-windows:
     strategy:
       matrix:
-        os: [windows-2016, windows-2019]
+        os: [windows-2019, windows-2022]
         cpu: [x64, x64_x86]
     runs-on: ${{ matrix.os }}
     steps:
@@ -48,7 +48,7 @@ jobs:
     strategy:
       matrix:
         build-type: [Debug, Release]
-        os: [macos-10.15, macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-2016, windows-2019]
+        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
   python-posix:
     strategy:
       matrix:
-        os: [macos-10.15, macos-11.0, ubuntu-18.04, ubuntu-20.04]
+        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
         python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -91,7 +91,7 @@ jobs:
   python-windows:
     strategy:
       matrix:
-        os: [windows-2016, windows-2019]
+        os: [windows-2019, windows-2022]
         python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
         python-architecture: [x86, x64]
     runs-on: ${{ matrix.os }}
