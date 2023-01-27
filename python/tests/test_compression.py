@@ -42,6 +42,32 @@ def test_decompress_keyword_args(algorithm):
     assert str(e.value) == "'zaphod' is an invalid keyword argument for this function"
 
 
+def test_decompress_bytes_like_data():
+    assert (
+        decompress(
+            memoryview(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
+            "lz4",
+        )
+        == b""
+    )
+
+
+def test_decompress_mutable_data():
+    assert (
+        decompress(
+            bytearray(b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
+            "lz4",
+        )
+        == b""
+    )
+
+
+def test_decompress_non_bytes_like_data():
+    with pytest.raises(TypeError) as e:
+        decompress("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", "lz4")
+    assert str(e.value) == "a bytes-like object is required, not 'str'"
+
+
 @pytest.mark.parametrize(
     ("encoded", "kwargs"),
     [
