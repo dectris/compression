@@ -1,5 +1,7 @@
 #define PY_SSIZE_T_CLEAN
+#define Py_LIMITED_API 0x03030000
 #include <Python.h>
+#include <string.h>
 
 #include "src/compression.h"
 
@@ -61,7 +63,7 @@ static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
             return NULL;
 
         Py_BEGIN_ALLOW_THREADS
-        n = compression_decompress_buffer(algorithm, PyBytes_AS_STRING(buffer),
+        n = compression_decompress_buffer(algorithm, PyBytes_AsString(buffer),
                                           output_size, input, input_size,
                                           elem_size);
         Py_END_ALLOW_THREADS
