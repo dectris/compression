@@ -27,6 +27,7 @@ static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
     Py_ssize_t elem_size = 0;
     CompressionAlgorithm algorithm;
     size_t output_size;
+    size_t n;
 
     if (!PyArg_ParseTupleAndKeywords(args, kw, "y#s#|$n", keywords, &input,
                                      &input_size, &algorithm_str,
@@ -59,9 +60,13 @@ static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
         if (!buffer)
             return NULL;
 
-        if (compression_decompress_buffer(algorithm, PyBytes_AS_STRING(buffer),
+        Py_BEGIN_ALLOW_THREADS
+        n = compression_decompress_buffer(algorithm, PyBytes_AS_STRING(buffer),
                                           output_size, input, input_size,
-                                          elem_size) == output_size)
+                                          elem_size);
+        Py_END_ALLOW_THREADS
+
+        if (n == output_size)
             return buffer;
 
         Py_DECREF(buffer);
