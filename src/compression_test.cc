@@ -68,12 +68,12 @@ TEST(Compression, DecompressEmpty) {
 }
 
 TEST(Compression, DecompressErrorEmpty) {
-    char buffer[1];
-    EXPECT_EQ(compression_decompress_buffer(COMPRESSION_BSLZ4_HDF5, buffer,
-                                            sizeof(buffer), nullptr, 0, 1),
+    char dst[1], src[1] = {0};
+    EXPECT_EQ(compression_decompress_buffer(COMPRESSION_BSLZ4_HDF5, dst,
+                                            sizeof(dst), src, 0, 1),
               COMPRESSION_ERROR);
-    EXPECT_EQ(compression_decompress_buffer(COMPRESSION_LZ4_HDF5, buffer,
-                                            sizeof(buffer), nullptr, 0, 0),
+    EXPECT_EQ(compression_decompress_buffer(COMPRESSION_LZ4_HDF5, dst,
+                                            sizeof(dst), src, 0, 0),
               COMPRESSION_ERROR);
 }
 
