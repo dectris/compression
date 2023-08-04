@@ -3,7 +3,24 @@ name: Build and Test
 on: [push, pull_request]
 
 jobs:
-  bazel-posix:
+  bazel-posix-clang:
+    strategy:
+      matrix:
+        os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Build
+        run: |
+          bazel build -c opt --config=clang //...
+      - name: Test
+        run: |
+          bazel test -c dbg --config=clang --config=asan --config=ubsan //...
+
+  bazel-posix-gcc:
     strategy:
       matrix:
         os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04]
@@ -16,15 +33,9 @@ jobs:
       - name: Build
         run: |
           bazel build -c opt //...
-      - name: Build with clang
+      - name: Test
         run: |
-          bazel build -c opt --config clang //...
-      - name: Test with ASan
-        run: |
-          bazel test -c dbg --config asan //...
-      - name: Test with UBSan
-        run: |
-          bazel test -c dbg --config ubsan //...
+          bazel test -c dbg --config=asan --config=ubsan //...
 
   bazel-windows:
     strategy:
