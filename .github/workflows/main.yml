@@ -6,7 +6,7 @@ jobs:
   bazel-posix:
     strategy:
       matrix:
-        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -48,7 +48,7 @@ jobs:
     strategy:
       matrix:
         build-type: [Debug, Release]
-        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022]
+        os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
   python-posix:
     strategy:
       matrix:
-        os: [macos-10.15, macos-11, macos-12, ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04]
         python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -113,36 +113,3 @@ jobs:
         run: python -m build
       - name: Run tox
         run: tox -e py
-
-  python-old-gcc:
-    strategy:
-      matrix:
-        gcc-version: [4.8]
-        os: [ubuntu-18.04]
-        python-version: [3.7]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Setup python
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install gcc-${{ matrix.gcc-version }}
-        run: sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }}
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install build pytest tox
-      - name: Build package
-        run: python -m build
-        env:
-          CC: gcc-${{ matrix.gcc-version }}
-          CXX: g++-${{ matrix.gcc-version }}
-      - name: Run tox
-        run: tox -e py
-        env:
-          CC: gcc-${{ matrix.gcc-version }}
-          CXX: g++-${{ matrix.gcc-version }}
