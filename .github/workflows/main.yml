@@ -23,13 +23,33 @@ jobs:
   bazel-posix-gcc:
     strategy:
       matrix:
-        os: [macos-11, macos-12, macos-13, ubuntu-20.04, ubuntu-22.04]
+        os: [macos-11, macos-12, macos-13, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           submodules: true
+      - name: Build
+        run: |
+          bazel build -c opt //...
+      - name: Test
+        run: |
+          bazel test -c dbg --config=asan --config=ubsan //...
+
+  bazel-ubuntu-20_04-gcc:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+          # Bazel prefers LLD to GNU gold. Install LLD to avoid gold relocation overflow bug on ubuntu-20.04.
+          # https://mail.gnu.org/archive/html/bug-binutils/2020-04/msg00329.html
+          sudo apt-get update
+          sudo apt-get install lld
       - name: Build
         run: |
           bazel build -c opt //...

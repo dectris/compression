@@ -30,8 +30,7 @@ setup(
             sources=[
                 "python/dectris/compression.c",
                 "src/compression.c",
-                "third_party/bitshuffle/src/bitshuffle_core.c",
-                "third_party/bitshuffle/src/iochain.c",
+                "third_party/bitshuffle/src/bitshuffle.c",
                 "third_party/lz4/lib/lz4.c",
             ],
             include_dirs=[

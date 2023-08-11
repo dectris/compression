@@ -13,6 +13,6 @@ add_library(compression STATIC
   src/compression.h
   )
 target_link_libraries(compression
-  PRIVATE bitshuffle_core
+  PRIVATE bitshuffle
   PRIVATE lz4
   )

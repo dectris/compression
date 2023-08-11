@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bitshuffle/src/bitshuffle_internals.h"
+#include "bitshuffle/src/bitshuffle.h"
 #include "lz4/lib/lz4.h"
 #include "src/compression.h"
 
@@ -25,6 +25,10 @@
 #pragma GCC diagnostic ignored "-Wtautological-constant-out-of-range-compare"
 #elif defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
+
+#ifndef BSHUF_BLOCKED_MULT
+#define BSHUF_BLOCKED_MULT 8
 #endif
 
 static uint32_t read_u32_be(const char* buf) {
@@ -65,13 +69,13 @@ static _Bool decompress_bslz4_block(char** const dst,
     *src += 4;
     if (compressed_size > INT_MAX || (int)compressed_size > src_end - *src)
         return 0;
-    if (LZ4_decompress_safe(*src, tmp_buf, compressed_size, block_size) !=
+    if (LZ4_decompress_safe(*src, &tmp_buf[0], compressed_size, block_size) !=
         (int)block_size)
     {
         return 0;
     }
-    if (bshuf_untrans_bit_elem(tmp_buf, *dst, block_size / elem_size,
-                               elem_size) != block_size)
+    if (bitshuf_decode_block(*dst, &tmp_buf[0], &tmp_buf[block_size],
+                             block_size / elem_size, elem_size) != 0)
     {
         return 0;
     }
@@ -107,7 +111,7 @@ static size_t decompress_buffer_bslz4_hdf5(char* dst,
     if (orig_size == 0)
         return 0;
 
-    char* tmp_buf = malloc(block_size);
+    char* tmp_buf = malloc(block_size * 2);
     if (!tmp_buf)
         return COMPRESSION_ERROR;
 

@@ -1,9 +1,6 @@
-add_library(bitshuffle_core STATIC
-  bitshuffle/src/bitshuffle_core.c
-  bitshuffle/src/bitshuffle_core.h
-  bitshuffle/src/bitshuffle_internals.h
-  bitshuffle/src/iochain.c
-  bitshuffle/src/iochain.h
+add_library(bitshuffle STATIC
+  bitshuffle/src/bitshuffle.c
+  bitshuffle/src/bitshuffle.h
   )
 
 add_library(lz4 STATIC
