@@ -216,10 +216,10 @@ size_t compression_decompress_buffer(CompressionAlgorithm algorithm,
                                      size_t src_size,
                                      size_t elem_size) {
     switch (algorithm) {
-        case COMPRESSION_BSLZ4_HDF5:
+        case COMPRESSION_BSLZ4:
             return decompress_buffer_bslz4_hdf5(dst, dst_size, src, src_size,
                                                 elem_size);
-        case COMPRESSION_LZ4_HDF5:
+        case COMPRESSION_LZ4:
             return decompress_buffer_lz4_hdf5(dst, dst_size, src, src_size);
     }
     return COMPRESSION_ERROR;

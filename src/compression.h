@@ -24,7 +24,7 @@ typedef enum {
      * https://lz4.github.io/lz4/
      * https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md
      */
-    COMPRESSION_BSLZ4_HDF5,
+    COMPRESSION_BSLZ4,
 
     /* LZ4 compression (HDF5 framing)
      *
@@ -37,7 +37,7 @@ typedef enum {
      * https://github.com/lz4/lz4/blob/master/doc/lz4_Block_format.md
      * https://support.hdfgroup.org/services/filters/HDF5_LZ4.pdf
      */
-    COMPRESSION_LZ4_HDF5,
+    COMPRESSION_LZ4,
 
 } CompressionAlgorithm;
 

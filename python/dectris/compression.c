@@ -6,10 +6,10 @@
 static int parse_algorithm(const char* identifier,
                            CompressionAlgorithm* algorithm) {
     if (strcmp(identifier, "bslz4") == 0) {
-        *algorithm = COMPRESSION_BSLZ4_HDF5;
+        *algorithm = COMPRESSION_BSLZ4;
         return 1;
     } else if (strcmp(identifier, "lz4") == 0) {
-        *algorithm = COMPRESSION_LZ4_HDF5;
+        *algorithm = COMPRESSION_LZ4;
         return 1;
     }
     return 0;
@@ -43,7 +43,7 @@ static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
         goto error;
     }
 
-    if (algorithm == COMPRESSION_BSLZ4_HDF5) {
+    if (algorithm == COMPRESSION_BSLZ4) {
         if (elem_size == 0) {
             PyErr_SetString(PyExc_ValueError,
                             "algorithm requires argument 'elem_size'");
