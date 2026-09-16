@@ -1,6 +1,22 @@
 from dectris.compression import decompress
 import pytest
+import struct
 import sys
+
+# Streams produced by the DECTRIS champex encoder, see src/compression_test.cc.
+BSZSTD_U8 = (
+    b"\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x08\x00\x00\x00\x11\x28\xb5\x2f\xfd\x20\x08\x41\x00\x00\x55\xcc\x3c\x56\x98\xe0\x00\x00\x39\x40\x47\x4e",
+    bytes([1, 8, 15, 22, 29, 36, 43, 50, 57, 64, 71, 78]),
+)
+BSZSTD_U16 = (
+    b"\x00\x00\x00\x00\x00\x00\x00\x26\x00\x00\x00\x10\x00\x00\x00\x19\x28\xb5\x2f\xfd\x20\x10\x81\x00\x00\xff\x00\x55\xcc\x96\xb2\x24\x38\x6a\x4c\x70\x80\x00\x00\x00\x00\x00\x00\x00\x19\x28\xb5\x2f\xfd\x20\x10\x81\x00\x00\xff\x00\x55\xcc\x96\x4d\x69\x8e\xa5\x36\x38\x3f\xc0\x00\x00\x00\xc5\x12\xf1\x13\x1d\x15",
+    struct.pack("<19H", *range(5, 5 + 300 * 19, 300)),
+)
+TRPX_U16 = (
+    b'<Terse prolix_bits="16" signed="0" block="12" number_of_values="16" number_of_frames="1" memory_sizes_of_frames="48 " memory_size="48" metadata_string_sizes="0 "/>'
+    b"\xfc\xff\xf3\x9b\x9f\x01\x40\xfa\x10\x7d\xe4\x2e\xa1\x0f\x00\x10\x77\x65\x6d\x41\x5f\xca\x18\x71\xe6\xab\x06\x77\x91\x65\x58\x1b\x53\x07\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+    struct.pack("<16H", *[65535 if i == 5 else i * 1000 for i in range(16)]),
+)
 
 
 def test_decompress_positional_args():
@@ -23,7 +39,7 @@ def test_decompress_positional_args():
         assert str(e.value) == "Function takes at most 2 positional arguments (3 given)"
 
 
-@pytest.mark.parametrize("algorithm", ["bslz4", "lz4"])
+@pytest.mark.parametrize("algorithm", ["bslz4", "bszstd", "lz4"])
 def test_decompress_keyword_args(algorithm):
     assert (
         decompress(
@@ -87,6 +103,14 @@ def test_decompress_non_bytes_like_data():
             b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
             {"algorithm": "lz4"},
         ),
+        (
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            {"algorithm": "bszstd", "elem_size": 1},
+        ),
+        (
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            {"algorithm": "bszstd", "elem_size": 2},
+        ),
     ],
 )
 def test_decompress_empty(encoded, kwargs):
@@ -123,6 +147,20 @@ def test_decompress_turing(encoded, kwargs, expected):
 
 
 @pytest.mark.parametrize(
+    ("encoded", "kwargs", "expected"),
+    [
+        (BSZSTD_U8[0], {"algorithm": "bszstd", "elem_size": 1}, BSZSTD_U8[1]),
+        (BSZSTD_U16[0], {"algorithm": "bszstd", "elem_size": 2}, BSZSTD_U16[1]),
+        (TRPX_U16[0], {"algorithm": "trpx"}, TRPX_U16[1]),
+        (TRPX_U16[0], {"algorithm": "trpx", "elem_size": 2}, TRPX_U16[1]),
+        (TRPX_U16[0] * 2, {"algorithm": "trpx"}, TRPX_U16[1] * 2),
+    ],
+)
+def test_decompress_golden(encoded, kwargs, expected):
+    assert decompress(encoded, **kwargs) == expected
+
+
+@pytest.mark.parametrize(
     ("encoded", "kwargs"),
     [
         (
@@ -141,6 +179,24 @@ def test_decompress_turing(encoded, kwargs, expected):
             b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00",
             {"algorithm": "lz4"},
         ),
+        (
+            b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00",
+            {"algorithm": "bszstd", "elem_size": 1},
+        ),
+        # Corrupted zstd frame.
+        (
+            BSZSTD_U16[0][:20] + bytes([BSZSTD_U16[0][20] ^ 0xFF]) + BSZSTD_U16[0][21:],
+            {"algorithm": "bszstd", "elem_size": 2},
+        ),
+        # Wrong element size.
+        (BSZSTD_U16[0], {"algorithm": "bszstd", "elem_size": 4}),
+        (TRPX_U16[0], {"algorithm": "trpx", "elem_size": 4}),
+        (TRPX_U16[0], {"algorithm": "trpx", "elem_size": 3}),
+        # Not a TRPX stream, truncated stream, trailing garbage.
+        (b"", {"algorithm": "trpx"}),
+        (b"not a trpx stream", {"algorithm": "trpx"}),
+        (TRPX_U16[0][:-8], {"algorithm": "trpx"}),
+        (TRPX_U16[0] + b"garbage", {"algorithm": "trpx"}),
     ],
 )
 def test_decompress_error(encoded, kwargs):
@@ -166,7 +222,7 @@ def test_decompress_unknown_algorithm(algorithm):
     assert str(e.value) == f"unknown algorithm: '{algorithm}'"
 
 
-@pytest.mark.parametrize("algorithm", ["bslz4", "lz4"])
+@pytest.mark.parametrize("algorithm", ["bslz4", "bszstd", "lz4", "trpx"])
 @pytest.mark.parametrize("elem_size", [-1, -32768])
 def test_decompress_elem_size_must_be_positive(algorithm, elem_size):
     with pytest.raises(ValueError) as e:
@@ -178,7 +234,7 @@ def test_decompress_elem_size_must_be_positive(algorithm, elem_size):
     assert str(e.value) == "'elem_size' must be positive"
 
 
-@pytest.mark.parametrize("algorithm", ["bslz4"])
+@pytest.mark.parametrize("algorithm", ["bslz4", "bszstd"])
 def test_decompress_algorithm_requires_elem_size(algorithm):
     with pytest.raises(ValueError) as e:
         decompress(

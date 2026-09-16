@@ -18,3 +18,13 @@ new_local_repository(
     build_file = "//third_party:lz4.BUILD",
     path = "third_party/lz4",
 )
+
+new_local_repository(
+    name = "zstd",
+    build_file = "//third_party:zstd.BUILD",
+    path = "third_party/zstd",
+)
+
+load("//third_party:trpx.bzl", "trpx_repository")
+
+trpx_repository(name = "trpx")
