@@ -1,0 +1,25 @@
+From eb375f006d3a375c4376e2bcb7ba78ca626624bf Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:53:42 +0200
+Subject: [PATCH] Fix unused variable warning
+
+`local_data` only exists to release the moved-from container at the end
+of the scope and is otherwise unused. GCC and Clang warn about it with
+-Wall (-Wunused-variable), which breaks builds with -Werror.
+---
+ include/Terse.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index 66c8b77..379ef5f 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -460,7 +460,7 @@ public:
+             d_terse_frames.insert(at, d_concurrent->background([this, d = std::move(data), mode] { return f_compress(mode, d.data()); }));
+         else {
+             d_terse_frames.insert(at, f_compress(mode, data.data()));
+-            auto local_data = std::move(data);
++            [[maybe_unused]] auto local_data = std::move(data);
+         }
+     }
+ 

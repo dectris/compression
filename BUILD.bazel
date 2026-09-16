@@ -15,6 +15,22 @@ COPTS = select({
     ],
 })
 
+CXX_STD_COPTS = select({
+    "@platforms//os:windows": ["/std:c++20"],
+    "//conditions:default": ["-std=c++20"],
+})
+
+# Suppresses the warnings of the third party TRPX headers on MSVC, which treats
+# the `includes` of @trpx as regular include directories (other compilers use
+# -isystem).
+TRPX_COPTS = select({
+    "@platforms//os:windows": [
+        "/external:Iexternal/trpx/include",
+        "/external:W0",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "compression",
     srcs = [
@@ -27,8 +43,26 @@ cc_library(
         "-Iexternal",
     ],
     deps = [
+        ":trpx",
         "@bitshuffle",
         "@lz4",
+        "@zstd",
+    ],
+)
+
+# C++ implementation of COMPRESSION_TRPX.
+cc_library(
+    name = "trpx",
+    srcs = [
+        "src/trpx.cc",
+    ],
+    hdrs = [
+        "src/compression.h",
+        "src/trpx.h",
+    ],
+    copts = COPTS + CXX_STD_COPTS + TRPX_COPTS,
+    deps = [
+        "@trpx",
     ],
 )
 
@@ -37,13 +71,15 @@ cc_test(
     srcs = [
         "src/compression_test.cc",
     ],
-    copts = COPTS + select({
-        "@platforms//os:windows": [],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    copts = COPTS + CXX_STD_COPTS + TRPX_COPTS + [
+        "-Iexternal",
+    ],
     deps = [
         ":compression",
+        "@bitshuffle",
         "@gtest",
         "@gtest//:gtest_main",
+        "@trpx",
+        "@zstd//:zstd_compress",
     ],
 )

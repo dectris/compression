@@ -19,7 +19,10 @@
 
 #include "bitshuffle/src/bitshuffle.h"
 #include "lz4/lib/lz4.h"
+#include "zstd/lib/zstd.h"
+
 #include "src/compression.h"
+#include "src/trpx.h"
 
 #if defined(__clang__)
 #pragma GCC diagnostic ignored "-Wtautological-constant-out-of-range-compare"
@@ -57,7 +60,31 @@ static _Bool parse_header(const char** const src,
     return 1;
 }
 
-static _Bool decompress_bslz4_block(char** const dst,
+/* Compression applied to the individual bitshuffle transposed blocks. */
+typedef enum {
+    BLOCK_CODEC_LZ4,
+    BLOCK_CODEC_ZSTD,
+} BlockCodec;
+
+static _Bool decompress_block(BlockCodec codec,
+                              char* const dst,
+                              const uint32_t dst_size,
+                              const char* const src,
+                              const uint32_t src_size) {
+    switch (codec) {
+        case BLOCK_CODEC_LZ4:
+            return LZ4_decompress_safe(src, dst, src_size, dst_size) ==
+                   (int)dst_size;
+        case BLOCK_CODEC_ZSTD: {
+            const size_t n = ZSTD_decompress(dst, dst_size, src, src_size);
+            return !ZSTD_isError(n) && n == dst_size;
+        }
+    }
+    return 0;
+}
+
+static _Bool decompress_bshuf_block(BlockCodec codec,
+                                    char** const dst,
                                     const char** const src,
                                     const char* const src_end,
                                     char* const tmp_buf,
@@ -69,8 +96,8 @@ static _Bool decompress_bslz4_block(char** const dst,
     *src += 4;
     if (compressed_size > INT_MAX || (int)compressed_size > src_end - *src)
         return 0;
-    if (LZ4_decompress_safe(*src, &tmp_buf[0], compressed_size, block_size) !=
-        (int)block_size)
+    if (!decompress_block(codec, &tmp_buf[0], block_size, *src,
+                          compressed_size))
     {
         return 0;
     }
@@ -84,7 +111,8 @@ static _Bool decompress_bslz4_block(char** const dst,
     return 1;
 }
 
-static size_t decompress_buffer_bslz4_hdf5(char* dst,
+static size_t decompress_buffer_bshuf_hdf5(BlockCodec codec,
+                                           char* dst,
                                            size_t dst_size,
                                            const char* src,
                                            size_t src_size,
@@ -122,15 +150,15 @@ static size_t decompress_buffer_bslz4_hdf5(char* dst,
     const uint32_t last_block_size = (orig_size % block_size) - leftover_bytes;
 
     for (uint64_t block = 0; block < full_block_count; ++block) {
-        if (!decompress_bslz4_block(&dst, &src, src_end, tmp_buf, block_size,
-                                    elem_size))
+        if (!decompress_bshuf_block(codec, &dst, &src, src_end, tmp_buf,
+                                    block_size, elem_size))
         {
             free(tmp_buf);
             return COMPRESSION_ERROR;
         }
     }
     if (last_block_size > 0) {
-        if (!decompress_bslz4_block(&dst, &src, src_end, tmp_buf,
+        if (!decompress_bshuf_block(codec, &dst, &src, src_end, tmp_buf,
                                     last_block_size, elem_size))
         {
             free(tmp_buf);
@@ -217,10 +245,16 @@ size_t compression_decompress_buffer(CompressionAlgorithm algorithm,
                                      size_t elem_size) {
     switch (algorithm) {
         case COMPRESSION_BSLZ4:
-            return decompress_buffer_bslz4_hdf5(dst, dst_size, src, src_size,
-                                                elem_size);
+            return decompress_buffer_bshuf_hdf5(BLOCK_CODEC_LZ4, dst, dst_size,
+                                                src, src_size, elem_size);
         case COMPRESSION_LZ4:
             return decompress_buffer_lz4_hdf5(dst, dst_size, src, src_size);
+        case COMPRESSION_BSZSTD:
+            return decompress_buffer_bshuf_hdf5(BLOCK_CODEC_ZSTD, dst, dst_size,
+                                                src, src_size, elem_size);
+        case COMPRESSION_TRPX:
+            return compression_decompress_buffer_trpx(dst, dst_size, src,
+                                                      src_size, elem_size);
     }
     return COMPRESSION_ERROR;
 }
