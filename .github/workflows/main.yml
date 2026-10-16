@@ -79,7 +79,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15, macos-15-intel, macos-26]
-        python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
+        python-version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "3.13", "3.14"]
         # Python versions not provided by actions/setup-python for these images.
         exclude:
           - os: ubuntu-24.04
@@ -117,12 +117,21 @@ jobs:
     strategy:
       matrix:
         os: [windows-2022, windows-2025]
-        python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
+        python-version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "3.13", "3.14"]
         python-architecture: [x86, x64]
         include:
           # actions/setup-python provides Python for Windows on Arm since 3.11.
           - os: windows-11-arm
             python-version: "3.11"
+            python-architecture: arm64
+          - os: windows-11-arm
+            python-version: "3.12"
+            python-architecture: arm64
+          - os: windows-11-arm
+            python-version: "3.13"
+            python-architecture: arm64
+          - os: windows-11-arm
+            python-version: "3.14"
             python-architecture: arm64
     runs-on: ${{ matrix.os }}
     steps:

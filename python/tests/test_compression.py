@@ -55,7 +55,11 @@ def test_decompress_keyword_args(algorithm):
             algorithm=algorithm,
             zaphod=1,
         )
-    assert str(e.value) == "'zaphod' is an invalid keyword argument for this function"
+    # The error message of PyArg_ParseTupleAndKeywords changed in Python 3.13.
+    assert str(e.value) in (
+        "'zaphod' is an invalid keyword argument for this function",
+        "this function got an unexpected keyword argument 'zaphod'",
+    )
 
 
 def test_decompress_bytes_like_data():
