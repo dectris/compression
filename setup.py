@@ -77,8 +77,9 @@ setup(
             + sorted(glob("third_party/zstd/lib/decompress/*.c")),
             include_dirs=[
                 ".",
-                "third_party",
+                "third_party/bitshuffle/src",
                 "third_party/lz4/lib",
+                "third_party/zstd/lib",
             ],
             define_macros=[
                 # No legacy formats and no x86-64 assembly (portable C fallback).

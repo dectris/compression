@@ -1,0 +1,27 @@
+From 652dc9434e49b682187521250372cf5f8e9cec2d Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Fri, 16 Oct 2026 16:59:53 +0200
+Subject: [PATCH] Fix advancing the end iterator in XML_element::add_attribute
+
+The values of a container attribute are separated by spaces, which should
+not be appended after the last value. The check compares with
+`container.end() + 1`, which advances the end iterator (undefined, the MSVC
+debug STL aborts with "cannot seek vector iterator after end") and is
+always true. Compare the next iterator with `container.end()` instead.
+---
+ include/XML_element.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/XML_element.hpp b/include/XML_element.hpp
+index 85aa1ce..88cd317 100644
+--- a/include/XML_element.hpp
++++ b/include/XML_element.hpp
+@@ -366,7 +366,7 @@ public:
+         std::string values;
+         for (auto it = container.begin(); it != container.end(); ++it) {
+             values.append(std::to_string(*it));
+-            if (it != container.end() + 1)
++            if (it + 1 != container.end())
+                 values.append(" ");
+         }
+         return add_attribute(attribute, values);

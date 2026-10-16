@@ -30,8 +30,7 @@ protected:
     pos_type seekoff(off_type off,
                      std::ios_base::seekdir dir,
                      std::ios_base::openmode) override {
-        // Computed as offsets (std::streamoff is 64 bit also on 32 bit
-        // platforms) to check the bounds before forming the pointer.
+        // Computed as offsets to check the bounds before forming the pointer.
         const off_type size = end_ - begin_;
         off_type base = 0;
         switch (dir) {

@@ -1,4 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,17 +21,7 @@ CXX_STD_COPTS = select({
     "//conditions:default": ["-std=c++20"],
 })
 
-# Suppresses the warnings of the third party TRPX headers on MSVC, which treats
-# the `includes` of @trpx as regular include directories (other compilers use
-# -isystem).
-TRPX_COPTS = select({
-    "@platforms//os:windows": [
-        "/external:Iexternal/trpx/include",
-        "/external:W0",
-    ],
-    "//conditions:default": [],
-})
-
+# Usage: `#include "dectris_compression/src/compression.h"`
 cc_library(
     name = "compression",
     srcs = [
@@ -39,9 +30,8 @@ cc_library(
     hdrs = [
         "src/compression.h",
     ],
-    copts = COPTS + [
-        "-Iexternal",
-    ],
+    copts = COPTS,
+    include_prefix = "dectris_compression",
     deps = [
         ":trpx",
         "@bitshuffle",
@@ -60,7 +50,11 @@ cc_library(
         "src/compression.h",
         "src/trpx.h",
     ],
-    copts = COPTS + CXX_STD_COPTS + TRPX_COPTS,
+    copts = COPTS + CXX_STD_COPTS,
+    # Required by targets including the TRPX headers to suppress the warnings
+    # of the third party headers (-isystem, MSVC: /external:I).
+    features = ["external_include_paths"],
+    visibility = ["//visibility:private"],
     deps = [
         "@trpx",
     ],
@@ -71,15 +65,13 @@ cc_test(
     srcs = [
         "src/compression_test.cc",
     ],
-    copts = COPTS + CXX_STD_COPTS + TRPX_COPTS + [
-        "-Iexternal",
-    ],
+    copts = COPTS + CXX_STD_COPTS,
+    features = ["external_include_paths"],
     deps = [
         ":compression",
         "@bitshuffle",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@googletest//:gtest_main",
         "@trpx",
-        "@zstd//:zstd_compress",
+        "@zstd",
     ],
 )

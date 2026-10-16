@@ -17,9 +17,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bitshuffle/src/bitshuffle.h"
-#include "lz4/lib/lz4.h"
-#include "zstd/lib/zstd.h"
+#include "bitshuffle.h"
+#include "lz4.h"
+#include "zstd.h"
 
 #include "src/compression.h"
 #include "src/trpx.h"

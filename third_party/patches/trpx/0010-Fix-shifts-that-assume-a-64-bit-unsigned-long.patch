@@ -1,0 +1,70 @@
+From c9386625b28c7b8252a2df0ac570bf183649fa25 Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Fri, 16 Oct 2026 15:34:01 +0200
+Subject: [PATCH] Fix shifts that assume a 64 bit unsigned long
+
+The bit masks are computed with `(1ul << B) - 1`. `unsigned long` has 32
+bits on Windows (LLP64), so the shift is undefined for B >= 32, e.g. when
+compressing 32 bit data. Compute the masks from a 64 bit value shifted to
+the right, which is also defined for B == 64.
+
+For the same reason, multiply the dimensions as std::size_t instead of
+unsigned long.
+---
+ include/Bitqueue.hpp | 8 ++++----
+ include/Terse.hpp    | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/include/Bitqueue.hpp b/include/Bitqueue.hpp
+index 9e698b5..6982156 100644
+--- a/include/Bitqueue.hpp
++++ b/include/Bitqueue.hpp
+@@ -142,7 +142,7 @@ public:
+     constexpr void push_back(std::span<T,N> const values) noexcept {
+         static_assert(sizeof(T) <= sizeof(std::size_t), "Type too large");
+         if constexpr (B != 0) {
+-            decltype(d_buffer) const mask = ((1ul << B) - 1);
++            decltype(d_buffer) const mask = ~decltype(d_buffer){0} >> (sizeof(decltype(d_buffer)) * 8 - B);
+             for (auto const& val : values) {
+                 if constexpr (std::is_signed_v<T>)
+                     d_buffer |= static_cast<decltype(d_buffer)>(static_cast<std::make_unsigned_t<T>>(val) & mask) << d_buffered_bits;
+@@ -174,7 +174,7 @@ public:
+         static_assert(sizeof(T) <= sizeof(std::size_t), "Type too large");
+         assert(B <= sizeof(T) * 8);
+         if (B != 0) {
+-            decltype(d_buffer) const mask = ((1ul << B) - 1);
++            decltype(d_buffer) const mask = ~decltype(d_buffer){0} >> (sizeof(decltype(d_buffer)) * 8 - B);
+             for (auto const& val : values) {
+                 if constexpr (std::is_signed_v<T>)
+                     d_buffer |= static_cast<decltype(d_buffer)>(static_cast<std::make_unsigned_t<T>>(val) & mask) << d_buffered_bits;
+@@ -297,7 +297,7 @@ public:
+         if (B==0)
+             std::fill(values.begin(), values.end(), 0);
+         else {
+-            T const mask = static_cast<T>((1ul << B) - 1);
++            T const mask = static_cast<T>(~std::uint64_t{0} >> (64 - B));
+             T const is_negative = std::is_unsigned_v<T> ? T(0) : T(T(1) << (B - 1));
+             for (auto& p : values) {
+                 p = static_cast<T>(d_buffer);
+@@ -356,7 +356,7 @@ public:
+                 }
+                 if constexpr (B != 8 * sizeof(T)) {
+                     constexpr T is_negative = std::is_unsigned_v<T> ? T(0) : T(T(1) << (B - 1));
+-                    constexpr auto mask = static_cast<std::make_unsigned_t<T>>((1ul << B) - 1);
++                    constexpr auto mask = static_cast<std::make_unsigned_t<T>>(~std::uint64_t{0} >> (64 - B));
+                     if (p & is_negative) p |= static_cast<T>(~mask);
+                     else p &= static_cast<T>(mask);
+                 }
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index 228dc9a..6abd76d 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -731,7 +731,7 @@ public:
+      * @throws std::invalid_argument If the provided dimensions differ from dimensions that were set earlier.
+      */
+     void dim(std::vector<std::size_t> const& dim) {
+-        if (d_dim.size() == 0 || size() == std::accumulate(dim.begin(), dim.end(), 1ul, std::multiplies<>()))
++        if (d_dim.size() == 0 || size() == std::accumulate(dim.begin(), dim.end(), std::size_t{1}, std::multiplies<>()))
+             d_dim = dim;
+         if (dim != d_dim)
+             throw std::invalid_argument("Dimensions already set.");

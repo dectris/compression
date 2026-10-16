@@ -1,9 +1,10 @@
 # Patches for third party sources
 
 The git submodules in `third_party/` are checked out at unmodified upstream
-commits. Patches in this directory are applied on a copy of the sources at
-build time, by Bazel (`patched_local_repository.bzl`), CMake (`patch`) and
-`setup.py` (`apply_patches.py`). Each patch file describes why it is needed.
+commits. Patches in this directory are applied at build time: by CMake and
+`setup.py` (both with `apply_patches.py`) on a copy of the submodule sources,
+and by Bazel on the upstream archive of the same commit
+(`http_archive` in `MODULE.bazel`). Each patch file describes why it is needed.
 
 ## trpx
 
@@ -25,4 +26,4 @@ git checkout --detach <pinned commit>
 git branch -D patches
 ```
 
-Then update `TRPX_PATCHES` in `third_party/trpx.bzl`.
+Then update the `patches` of `trpx` in `MODULE.bazel`.

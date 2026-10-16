@@ -1,0 +1,75 @@
+module(
+    name = "dectris_compression",
+    version = "0.3.1",
+    bazel_compatibility = [">=9.0.0"],
+)
+
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+
+# The Bazel build does not use the git submodules in third_party/ (CMake and
+# setup.py do), so the module also builds from a source archive without them.
+# Keep the versions in sync with the submodules.
+bazel_dep(name = "lz4", version = "1.9.4.bcr.2")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.3")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "bitshuffle",
+    build_file = "//third_party:bitshuffle.BUILD",
+    sha256 = "561ac45c0f8c4515e26269bbde5595ac071121b71e507398634952237b447089",
+    strip_prefix = "bitshuffle-7be5b2005fff1d95e036b781c34f84a19c55e523",
+    urls = ["https://github.com/kalcutter/bitshuffle/archive/7be5b2005fff1d95e036b781c34f84a19c55e523.tar.gz"],
+)
+
+# TERSE/PROLIX v2 (TRPX) header-only library. See the description in each
+# patch file for why it is needed. CMake and setup.py apply the same patches.
+http_archive(
+    name = "trpx",
+    build_file = "//third_party:trpx.BUILD",
+    patch_strip = 1,
+    patches = [
+        "//third_party/patches/trpx:0001-Add-missing-standard-library-includes.patch",
+        "//third_party/patches/trpx:0002-Create-the-global-thread-pool-lazily.patch",
+        "//third_party/patches/trpx:0003-Fix-unused-variable-warning.patch",
+        "//third_party/patches/trpx:0004-Fix-heap-buffer-overflow-when-growing-the-compressed.patch",
+        "//third_party/patches/trpx:0005-Fix-corrupt-output-for-32-bit-data-with-saturated-pi.patch",
+        "//third_party/patches/trpx:0006-Fix-decoder-reading-past-the-end-of-a-frame-for-a-sh.patch",
+        "//third_party/patches/trpx:0007-Fix-reading-frame-metadata-strings-into-the-std-stri.patch",
+        "//third_party/patches/trpx:0008-Add-typename-to-dependent-type-names.patch",
+        "//third_party/patches/trpx:0009-Do-not-use-std-make_shared_for_overwrite.patch",
+        "//third_party/patches/trpx:0010-Fix-shifts-that-assume-a-64-bit-unsigned-long.patch",
+        "//third_party/patches/trpx:0011-Fix-advancing-the-end-iterator-in-XML_element-add_at.patch",
+    ],
+    sha256 = "84e9f8d993a90dcc5d807220f31ef5a571976211ce7401538444bb5ac1b1872b",
+    strip_prefix = "trpx2.0-612181872bf870bae62174efc6940f7a6f9b2780",
+    urls = ["https://github.com/senikm/trpx2.0/archive/612181872bf870bae62174efc6940f7a6f9b2780.tar.gz"],
+)
+
+# ==========================================
+# Development dependencies (tests, toolchain)
+# ==========================================
+
+bazel_dep(name = "googletest", version = "1.18.0", dev_dependency = True)
+
+# Hermetic LLVM toolchain for Linux and macOS (arm64). Not available on
+# Windows (MSVC is used) and macOS x86_64 (no LLVM release).
+bazel_dep(name = "toolchains_llvm", version = "1.7.0", dev_dependency = True)
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm", dev_dependency = True)
+llvm.toolchain(
+    name = "llvm_toolchain",
+    extra_llvm_distributions = {
+        "LLVM-22.1.6-Linux-ARM64.tar.xz": "b67817634e8e1c2632dfc056af14d61b94f8e6502f4e557560eea227aa22ce37",
+        "LLVM-22.1.6-Linux-X64.tar.xz": "c5ac8ef89ca39d30cb32e9b83772f995dd891c685ebc188d593c943a64d5f8b5",
+        "LLVM-22.1.6-macOS-ARM64.tar.xz": "8059d9d9eeb059c30d812b4a37291888f8dcba04d2b5ace61fd12d2904eaa0e9",
+    },
+    llvm_version = "22.1.6",
+)
+use_repo(llvm, "llvm_toolchain")
+
+register_toolchains(
+    "@llvm_toolchain//:all",
+    dev_dependency = True,
+)

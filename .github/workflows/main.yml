@@ -3,67 +3,58 @@ name: Build and Test
 on: [push, pull_request]
 
 jobs:
-  bazel-posix-clang:
+  # Bazel builds with the hermetic LLVM toolchain of MODULE.bazel and does not
+  # use the git submodules. Not supported:
+  # - macOS x86_64: no LLVM release.
+  # - macos-15: the libc++ headers of LLVM 22 require a newer system libc++
+  #   (undefined symbol std::__1::__hash_memory).
+  # - ubuntu-26.04: ld.lld of the LLVM release requires libxml2.so.2, Ubuntu
+  #   26.04 only provides libxml2.so.16.
+  bazel-posix:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15, macos-15-intel, macos-26]
+        os: [ubuntu-22.04, ubuntu-24.04, macos-26]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: true
+        uses: actions/checkout@v7
       - name: Build
         run: |
-          bazel build -c opt --config=clang //...
+          bazel build -c opt //...
+      # The sanitizer runtimes on macOS are dylibs, which the test binaries do
+      # not find (the toolchain sets a relative rpath to them that is only valid
+      # in the execroot).
       - name: Test
         run: |
-          bazel test -c dbg --config=clang --config=asan --config=ubsan //...
+          bazel test -c dbg ${{ runner.os == 'Linux' && '--config=asan --config=ubsan' || '' }} //...
 
-  bazel-posix-gcc:
+  bazel-windows:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15, macos-15-intel, macos-26]
+        os: [windows-2022, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: true
+        uses: actions/checkout@v7
       - name: Build
         run: |
           bazel build -c opt //...
       - name: Test
         run: |
-          bazel test -c dbg --config=asan --config=ubsan //...
-
-  bazel-windows:
-    strategy:
-      matrix:
-        os: [windows-2022, windows-2025]
-        cpu: [x64, x64_x86]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: true
-      - name: Build
-        run: |
-          bazel build -c opt --cpu ${{ matrix.cpu }}_windows //...
-      - name: Test
-        run: |
-          bazel test -c dbg --cpu ${{ matrix.cpu }}_windows //...
+          bazel test -c dbg //...
 
   cmake:
     strategy:
+      fail-fast: false
       matrix:
         build-type: [Debug, Release]
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15, macos-15-intel, macos-26, windows-2022, windows-2025, windows-11-arm]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           submodules: true
       - name: Create Build Directory
@@ -77,6 +68,7 @@ jobs:
 
   python-posix:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15, macos-15-intel, macos-26]
         python-version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -97,11 +89,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           submodules: true
       - name: Setup python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
@@ -115,10 +107,11 @@ jobs:
 
   python-windows:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-2022, windows-2025]
         python-version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "3.13", "3.14"]
-        python-architecture: [x86, x64]
+        python-architecture: [x64]
         include:
           # actions/setup-python provides Python for Windows on Arm since 3.11.
           - os: windows-11-arm
@@ -136,11 +129,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           submodules: true
       - name: Setup python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.python-architecture }}
@@ -152,3 +145,31 @@ jobs:
         run: python -m build
       - name: Run tox
         run: tox -e py
+
+  # Source distribution for PyPI, created once all builds and tests passed.
+  sdist:
+    needs: [bazel-posix, bazel-windows, cmake, python-posix, python-windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Setup python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install build twine
+      - name: Build sdist
+        run: python -m build --sdist
+      - name: Check sdist
+        run: twine check --strict dist/*.tar.gz
+      - name: Upload sdist
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
