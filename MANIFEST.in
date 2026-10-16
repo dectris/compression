@@ -15,4 +15,5 @@ include third_party/zstd/COPYING
 include third_party/zstd/lib/zstd.h
 include third_party/zstd/lib/zstd_errors.h
 include third_party/zstd/lib/common/*.h
+include third_party/zstd/lib/compress/*.h
 include third_party/zstd/lib/decompress/*.h

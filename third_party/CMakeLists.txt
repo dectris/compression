@@ -10,9 +10,10 @@ add_library(lz4 STATIC
   )
 target_include_directories(lz4 PUBLIC lz4/lib)
 
-# Decompression only, no legacy formats and no x86-64 assembly.
+# No dictionary builder, no legacy formats and no x86-64 assembly.
 file(GLOB ZSTD_SOURCES
   zstd/lib/common/*.c
+  zstd/lib/compress/*.c
   zstd/lib/decompress/*.c
   )
 add_library(zstd STATIC

@@ -72,8 +72,9 @@ setup(
                 "third_party/bitshuffle/src/bitshuffle.c",
                 "third_party/lz4/lib/lz4.c",
             ]
-            # zstd: decompression only.
+            # zstd: no dictionary builder.
             + sorted(glob("third_party/zstd/lib/common/*.c"))
+            + sorted(glob("third_party/zstd/lib/compress/*.c"))
             + sorted(glob("third_party/zstd/lib/decompress/*.c")),
             include_dirs=[
                 ".",
