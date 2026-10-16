@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -8,11 +8,13 @@ package(default_visibility = ["//visibility:public"])
 #     #include "Concurrent.hpp"
 #     #include "Terse.hpp"
 #
-# `includes` adds the directory as a system include path for dependents so the
-# third party headers do not trigger their warnings.
+# The headers are external includes for dependents so the third party headers
+# do not trigger their warnings (-isystem, MSVC: /external:I with
+# /external:W0).
 cc_library(
     name = "trpx",
     hdrs = glob(["include/*.hpp"]),
+    features = ["external_include_paths"],
     includes = ["include"],
     linkopts = select({
         "@platforms//os:windows": [],

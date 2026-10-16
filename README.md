@@ -16,3 +16,31 @@ from dectris.compression import decompress
 decompress(data, "bszstd", elem_size=2)
 decompress(data, "trpx")
 ```
+
+## Bazel
+
+The repository is a Bazel module (`dectris_compression`). It does not use the
+git submodules, so a source archive of a release can be used directly:
+
+```starlark
+# MODULE.bazel
+bazel_dep(name = "dectris_compression", version = "<version>")
+archive_override(
+    module_name = "dectris_compression",
+    integrity = "sha256-...",
+    strip_prefix = "compression-<version>",
+    urls = ["https://github.com/dectris/compression/archive/refs/tags/v<version>.tar.gz"],
+)
+```
+
+```starlark
+# BUILD.bazel
+cc_library(
+    ...
+    deps = ["@dectris_compression//:compression"],
+)
+```
+
+```c
+#include "dectris_compression/src/compression.h"
+```

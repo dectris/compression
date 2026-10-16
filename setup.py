@@ -1,6 +1,4 @@
 from glob import glob
-import importlib.util
-import os
 from pathlib import Path
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -11,29 +9,8 @@ long_description = (ROOT / "README.md").read_text()
 CXX_EXTENSIONS = (".cc", ".cpp", ".cxx")
 
 
-def load_apply_patches():
-    path = ROOT / "third_party" / "patches" / "apply_patches.py"
-    spec = importlib.util.spec_from_file_location("apply_patches", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 class BuildExt(build_ext):
     def build_extensions(self):
-        # Copy the TRPX headers (git submodule) to the build directory and
-        # apply the patches in third_party/patches/trpx. See the description
-        # in each patch file for why it is needed.
-        trpx_dir = os.path.join(self.build_temp, "trpx")
-        load_apply_patches().copy_and_patch(
-            str(ROOT / "third_party" / "trpx"),
-            trpx_dir,
-            sorted(glob(str(ROOT / "third_party" / "patches" / "trpx" / "*.patch"))),
-            paths=["include"],
-        )
-        for ext in self.extensions:
-            ext.include_dirs.append(os.path.join(trpx_dir, "include"))
-
         if self.compiler.compiler_type == "msvc":
             for ext in self.extensions:
                 ext.extra_compile_args.append("/std:c++20")
@@ -77,8 +54,10 @@ setup(
             + sorted(glob("third_party/zstd/lib/decompress/*.c")),
             include_dirs=[
                 ".",
-                "third_party",
+                "third_party/bitshuffle/src",
                 "third_party/lz4/lib",
+                "third_party/trpx/include",
+                "third_party/zstd/lib",
             ],
             define_macros=[
                 # No legacy formats and no x86-64 assembly (portable C fallback).

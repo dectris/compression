@@ -1,3 +1,0 @@
-# Patches must be stored byte for byte: they contain the line endings of the
-# files they apply to.
-*.patch -text

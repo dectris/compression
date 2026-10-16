@@ -1,12 +1,11 @@
-build:clang --repo_env=BAZEL_COMPILER=clang
-build:clang --repo_env=CC=clang
-build:clang --repo_env=CXX=clang++
-# https://github.com/bazelbuild/bazel/issues/11122
-# https://github.com/bazelbuild/bazel/issues/12797
-build:clang --linkopt=-fsanitize-link-c++-runtime
+# Print the log of failed tests (e.g. sanitizer reports in CI).
+test --test_output=errors
 
 build:asan --features=asan
 build:asan --test_env=ASAN_OPTIONS=check_initialization_order=1:detect_invalid_pointer_pairs=1:detect_stack_use_after_return=1:strict_init_order=1:strict_string_checks=1
 
 build:ubsan --features=ubsan
+# https://github.com/bazelbuild/bazel/issues/11122
+# https://github.com/bazelbuild/bazel/issues/12797
+build:ubsan --linkopt=-fsanitize-link-c++-runtime
 build:ubsan --test_env=UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1

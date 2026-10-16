@@ -10,8 +10,8 @@
 
 #include "gtest/gtest.h"
 
-#include "bitshuffle/src/bitshuffle.h"
-#include "zstd/lib/zstd.h"
+#include "bitshuffle.h"
+#include "zstd.h"
 
 // Concurrent.hpp must be included before Terse.hpp (also for Terse<void>).
 #include "Concurrent.hpp"
