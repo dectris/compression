@@ -1,7 +1,7 @@
 # dectris-compression
 This library provides compression algorithms used by DECTRIS.
 
-Supported algorithms (decompression only):
+Supported algorithms:
 
 | Algorithm | Identifier | Description |
 | --- | --- | --- |
@@ -9,6 +9,11 @@ Supported algorithms (decompression only):
 | `COMPRESSION_BSZSTD` | `bszstd` | Bitshuffle with Zstandard compression (HDF5 framing) |
 | `COMPRESSION_LZ4` | `lz4` | LZ4 compression (HDF5 framing) |
 | `COMPRESSION_TRPX` | `trpx` | TERSE/PROLIX v2 (TRPX) compression |
+
+All algorithms support decompression. The C API also supports compression
+with `COMPRESSION_BSZSTD` and `COMPRESSION_TRPX` (`compression_compress_buffer()`)
+and block by block streaming compression with `COMPRESSION_BSZSTD`
+(`compression_stream_encoder_create()`).
 
 ```python
 from dectris.compression import decompress

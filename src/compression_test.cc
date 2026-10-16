@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <climits>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -459,5 +460,411 @@ TEST(Compression, DecompressErrorTrpx) {
     EXPECT_EQ(decompress_error(COMPRESSION_TRPX,
                                TRPX_GOLDEN_U16 + encode_trpx(u8_values), 0,
                                n + u8_values.size()),
+              COMPRESSION_ERROR);
+}
+
+static std::string compress(CompressionAlgorithm algorithm,
+                            const std::string& data,
+                            size_t elem_size) {
+    const size_t bound =
+        compression_compress_bound(algorithm, data.size(), elem_size);
+    EXPECT_NE(bound, COMPRESSION_ERROR);
+    if (bound == COMPRESSION_ERROR)
+        return {};
+    std::string out(bound, '\0');
+    const size_t n =
+        compression_compress_buffer(algorithm, out.data(), out.size(),
+                                    data.data(), data.size(), elem_size);
+    EXPECT_NE(n, COMPRESSION_ERROR);
+    out.resize(n != COMPRESSION_ERROR ? n : 0);
+    return out;
+}
+
+template <typename T>
+static void check_trpx_compress(const std::vector<T>& values) {
+    const auto data = to_bytes(values);
+    const auto compressed = compress(COMPRESSION_TRPX, data, sizeof(T));
+    // The same stream as written by Terse (and the TERSE HDF5 filter).
+    EXPECT_EQ(compressed, encode_trpx(values)) << "n=" << values.size();
+    EXPECT_TRUE(check_decompress_buffer(COMPRESSION_TRPX, compressed,
+                                        sizeof(T), data))
+        << "n=" << values.size();
+}
+
+// Incompressible data: blocks with a saturated value (encoded as a run of
+// "masked" blocks) alternating with blocks of random values with a varying
+// number of significant bits.
+template <typename T>
+static std::vector<T> incompressible_values(std::mt19937_64& rng, size_t n) {
+    std::vector<T> values(n);
+    for (size_t i = 0; i < n; ++i) {
+        const size_t block = i / 12;
+        if (block % 2 == 0) {
+            values[i] = i % 12 == 0 ? std::numeric_limits<T>::max()
+                                    : static_cast<T>(rng());
+        } else {
+            const size_t width = 8 * sizeof(T);
+            const size_t bits = width - 1 - (block / 2) % 3 * (width / 4);
+            values[i] = static_cast<T>((rng() | (uint64_t{1} << (bits - 1))) &
+                                       ((uint64_t{1} << bits) - 1));
+        }
+    }
+    return values;
+}
+
+template <typename T>
+static void check_trpx_compress_round_trip(std::mt19937_64& rng) {
+    for (const size_t n : {0u, 1u, 11u, 12u, 13u, 24u, 77u, 1000u, 4099u}) {
+        check_trpx_compress(random_values<T>(rng, n));
+        check_trpx_compress(incompressible_values<T>(rng, n));
+        check_trpx_compress(std::vector<T>(n, std::numeric_limits<T>::max()));
+        std::vector<T> uniform(n);
+        for (auto& value : uniform)
+            value = static_cast<T>(rng());
+        check_trpx_compress(uniform);
+    }
+}
+
+TEST(Compression, CompressTrpxRoundTrip) {
+    std::mt19937_64 rng(17);
+    check_trpx_compress_round_trip<uint8_t>(rng);
+    check_trpx_compress_round_trip<uint16_t>(rng);
+    check_trpx_compress_round_trip<uint32_t>(rng);
+}
+
+TEST(Compression, CompressTrpxUnalignedSource) {
+    std::mt19937_64 rng(19);
+    const auto data = to_bytes(random_values<uint32_t>(rng, 1000));
+    const auto unaligned = "x"s + data;
+    std::string out(compression_compress_bound(COMPRESSION_TRPX, data.size(), 4),
+                    '\0');
+    const size_t n = compression_compress_buffer(
+        COMPRESSION_TRPX, out.data(), out.size(), unaligned.data() + 1,
+        data.size(), 4);
+    ASSERT_NE(n, COMPRESSION_ERROR);
+    out.resize(n);
+    EXPECT_EQ(out, compress(COMPRESSION_TRPX, data, 4));
+}
+
+TEST(Compression, CompressErrorTrpx) {
+    std::mt19937_64 rng(23);
+    const auto data = to_bytes(random_values<uint16_t>(rng, 1000));
+    const size_t n = compress(COMPRESSION_TRPX, data, 2).size();
+    std::string out(compression_compress_bound(COMPRESSION_TRPX, data.size(), 2),
+                    '\0');
+    const auto compress_into = [&](size_t dst_size, size_t src_size,
+                                   size_t elem_size) {
+        return compression_compress_buffer(COMPRESSION_TRPX, out.data(),
+                                           dst_size, data.data(), src_size,
+                                           elem_size);
+    };
+
+    // Unsupported element size.
+    for (const size_t elem_size : {0u, 3u, 8u}) {
+        EXPECT_EQ(compression_compress_bound(COMPRESSION_TRPX, data.size(),
+                                             elem_size),
+                  COMPRESSION_ERROR);
+        EXPECT_EQ(compress_into(out.size(), data.size(), elem_size),
+                  COMPRESSION_ERROR);
+    }
+    // Size not a multiple of the element size.
+    EXPECT_EQ(compression_compress_bound(COMPRESSION_TRPX, 3, 2),
+              COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(out.size(), data.size() - 1, 2), COMPRESSION_ERROR);
+    // Destination too small.
+    EXPECT_EQ(compress_into(n - 1, data.size(), 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(0, data.size(), 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compression_compress_buffer(COMPRESSION_TRPX, nullptr, 0,
+                                          data.data(), data.size(), 2),
+              COMPRESSION_ERROR);
+    // Overflow of the bound.
+    EXPECT_EQ(compression_compress_bound(COMPRESSION_TRPX, SIZE_MAX - 3, 4),
+              COMPRESSION_ERROR);
+}
+
+TEST(Compression, CompressUnsupportedAlgorithm) {
+    const auto data = "0123456789abcdef"s;
+    char out[1024];
+    for (const auto algorithm : {COMPRESSION_BSLZ4, COMPRESSION_LZ4}) {
+        EXPECT_EQ(compression_compress_bound(algorithm, data.size(), 2),
+                  COMPRESSION_ERROR);
+        EXPECT_EQ(compression_compress_buffer(algorithm, out, sizeof(out),
+                                              data.data(), data.size(), 2),
+                  COMPRESSION_ERROR);
+    }
+}
+
+// Block size in bytes of the bitshuffle HDF5 filter with the default block
+// size (bshuf_default_block_size()).
+static size_t bshuf_default_block_size_bytes(size_t elem_size) {
+    return std::max<size_t>(8192 / elem_size / 8 * 8, 128) * elem_size;
+}
+
+static void check_bszstd_compress(const std::string& data, size_t elem_size) {
+    const auto compressed = compress(COMPRESSION_BSZSTD, data, elem_size);
+    // The same stream as written by the bitshuffle HDF5 filter.
+    EXPECT_EQ(compressed,
+              encode_bszstd(data, elem_size,
+                            bshuf_default_block_size_bytes(elem_size)))
+        << "size=" << data.size() << " elem_size=" << elem_size;
+    EXPECT_TRUE(check_decompress_buffer(COMPRESSION_BSZSTD, compressed,
+                                        elem_size, data))
+        << "size=" << data.size() << " elem_size=" << elem_size;
+}
+
+template <typename T>
+static void check_bszstd_compress_round_trip(std::mt19937_64& rng) {
+    const size_t block = bshuf_default_block_size_bytes(sizeof(T)) / sizeof(T);
+    for (const size_t n : {size_t{0}, size_t{1}, size_t{7}, size_t{8},
+                           size_t{9}, block - 1, block, block + 1, block + 8,
+                           3 * block + 13}) {
+        check_bszstd_compress(to_bytes(random_values<T>(rng, n)), sizeof(T));
+        std::vector<T> uniform(n);
+        for (auto& value : uniform)
+            value = static_cast<T>(rng());
+        check_bszstd_compress(to_bytes(uniform), sizeof(T));
+    }
+}
+
+TEST(Compression, CompressBszstdRoundTrip) {
+    std::mt19937_64 rng(29);
+    check_bszstd_compress_round_trip<uint8_t>(rng);
+    check_bszstd_compress_round_trip<uint16_t>(rng);
+    check_bszstd_compress_round_trip<uint32_t>(rng);
+    check_bszstd_compress_round_trip<uint64_t>(rng);
+}
+
+TEST(Compression, CompressBszstdOddElementSize) {
+    std::mt19937_64 rng(31);
+    for (const size_t elem_size : {3u, 1000u}) {
+        std::string data(elem_size * 333, '\0');
+        for (auto& c : data)
+            c = static_cast<char>(rng() % 4);
+        check_bszstd_compress(data, elem_size);
+    }
+}
+
+TEST(Compression, CompressErrorBszstd) {
+    std::mt19937_64 rng(37);
+    const auto data = to_bytes(random_values<uint16_t>(rng, 10000));
+    const size_t n = compress(COMPRESSION_BSZSTD, data, 2).size();
+    std::string out(
+        compression_compress_bound(COMPRESSION_BSZSTD, data.size(), 2), '\0');
+    const auto compress_into = [&](size_t dst_size, size_t src_size,
+                                   size_t elem_size) {
+        return compression_compress_buffer(COMPRESSION_BSZSTD, out.data(),
+                                           dst_size, data.data(), src_size,
+                                           elem_size);
+    };
+
+    // Unsupported element size.
+    for (const size_t elem_size : {size_t{0}, size_t{INT_MAX}}) {
+        EXPECT_EQ(compression_compress_bound(COMPRESSION_BSZSTD, data.size(),
+                                             elem_size),
+                  COMPRESSION_ERROR);
+        EXPECT_EQ(compress_into(out.size(), data.size(), elem_size),
+                  COMPRESSION_ERROR);
+    }
+    // Size not a multiple of the element size.
+    EXPECT_EQ(compression_compress_bound(COMPRESSION_BSZSTD, 3, 2),
+              COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(out.size(), data.size() - 1, 2), COMPRESSION_ERROR);
+    // Destination too small (also for the header or the leftover bytes).
+    EXPECT_EQ(compress_into(n - 1, data.size(), 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(11, data.size(), 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(0, data.size(), 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compress_into(12, 14, 2), COMPRESSION_ERROR);
+    EXPECT_EQ(compression_compress_buffer(COMPRESSION_BSZSTD, nullptr, 0,
+                                          data.data(), data.size(), 2),
+              COMPRESSION_ERROR);
+    // Overflow of the bound.
+    EXPECT_EQ(compression_compress_bound(COMPRESSION_BSZSTD, SIZE_MAX - 1, 2),
+              COMPRESSION_ERROR);
+}
+
+using StreamEncoderPtr =
+    std::unique_ptr<CompressionStreamEncoder,
+                    decltype(&compression_stream_encoder_free)>;
+
+static StreamEncoderPtr create_bszstd_stream_encoder(size_t block_size,
+                                                     size_t elem_size) {
+    return {compression_stream_encoder_create(COMPRESSION_BSZSTD, block_size,
+                                              elem_size),
+            &compression_stream_encoder_free};
+}
+
+// Compresses `data` with `encoder`, providing the blocks one by one.
+static std::string stream_compress(CompressionStreamEncoder* encoder,
+                                   const std::string& data,
+                                   size_t block_size,
+                                   size_t elem_size) {
+    const size_t bound = compression_stream_bound(
+        COMPRESSION_BSZSTD, data.size(), block_size, elem_size);
+    EXPECT_NE(bound, COMPRESSION_ERROR);
+    if (bound == COMPRESSION_ERROR)
+        return {};
+    std::string out(bound, '\0');
+    size_t n = compression_stream_encoder_start(encoder, out.data(),
+                                                out.size(), data.size());
+    EXPECT_EQ(n, 12u);
+    if (n != 12)
+        return {};
+    if (block_size == 0)
+        block_size = bshuf_default_block_size_bytes(elem_size);
+    for (size_t pos = 0; pos < data.size(); pos += block_size) {
+        const size_t m = compression_stream_encoder_block(
+            encoder, out.data() + n, out.size() - n, data.data() + pos,
+            std::min(block_size, data.size() - pos));
+        EXPECT_NE(m, COMPRESSION_ERROR);
+        if (m == COMPRESSION_ERROR)
+            return {};
+        n += m;
+    }
+    out.resize(n);
+    return out;
+}
+
+template <typename T>
+static void check_bszstd_stream_round_trip(std::mt19937_64& rng) {
+    for (const size_t block_elems : {0u, 8u, 64u, 1000u, 8192u}) {
+        // The encoder is reused for all streams.
+        const size_t block_size = block_elems * sizeof(T);
+        auto encoder = create_bszstd_stream_encoder(block_size, sizeof(T));
+        ASSERT_TRUE(encoder);
+        const size_t block =
+            block_elems > 0
+                ? block_elems
+                : bshuf_default_block_size_bytes(sizeof(T)) / sizeof(T);
+        for (const size_t n : {size_t{0}, size_t{1}, size_t{7}, size_t{8},
+                               size_t{9}, block - 1, block, block + 1,
+                               block + 8, 3 * block + 13}) {
+            std::vector<T> uniform(n);
+            for (auto& value : uniform)
+                value = static_cast<T>(rng());
+            for (const auto& data :
+                 {to_bytes(random_values<T>(rng, n)), to_bytes(uniform)}) {
+                const auto compressed =
+                    stream_compress(encoder.get(), data, block_size, sizeof(T));
+                // The same stream as written by the bitshuffle HDF5 filter.
+                EXPECT_EQ(compressed,
+                          encode_bszstd(data, sizeof(T),
+                                        block_elems > 0
+                                            ? block_size
+                                            : bshuf_default_block_size_bytes(
+                                                  sizeof(T))))
+                    << "n=" << n << " block=" << block_elems;
+                EXPECT_TRUE(check_decompress_buffer(
+                    COMPRESSION_BSZSTD, compressed, sizeof(T), data))
+                    << "n=" << n << " block=" << block_elems;
+                if (block_elems == 0) {
+                    EXPECT_EQ(compressed,
+                              compress(COMPRESSION_BSZSTD, data, sizeof(T)));
+                }
+            }
+        }
+    }
+}
+
+TEST(Compression, StreamBszstdRoundTrip) {
+    std::mt19937_64 rng(41);
+    check_bszstd_stream_round_trip<uint8_t>(rng);
+    check_bszstd_stream_round_trip<uint16_t>(rng);
+    check_bszstd_stream_round_trip<uint32_t>(rng);
+    check_bszstd_stream_round_trip<uint64_t>(rng);
+}
+
+TEST(Compression, StreamBszstdBound) {
+    // The default block size and the size of a whole stream.
+    EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 100000, 0, 2),
+              compression_compress_bound(COMPRESSION_BSZSTD, 100000, 2));
+    // The stream header only.
+    EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 0, 128, 2), 12u);
+    // Leftover bytes (not a multiple of 8 elements) are stored as is.
+    EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 14, 128, 2),
+              12u + 14u);
+    EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 128 + 16 + 2, 128, 2),
+              12u + (4 + ZSTD_compressBound(128)) +
+                  (4 + ZSTD_compressBound(16)) + 2u);
+}
+
+TEST(Compression, StreamErrorBszstd) {
+    // Unsupported algorithms.
+    for (const auto algorithm :
+         {COMPRESSION_BSLZ4, COMPRESSION_LZ4, COMPRESSION_TRPX}) {
+        EXPECT_EQ(compression_stream_encoder_create(algorithm, 0, 2), nullptr);
+        EXPECT_EQ(compression_stream_bound(algorithm, 1000, 0, 2),
+                  COMPRESSION_ERROR);
+    }
+    // Unsupported element or block size.
+    for (const auto& [block_size, elem_size] :
+         std::vector<std::pair<size_t, size_t>>{
+             {0, 0}, {128, 0}, {12, 2}, {8, 2}, {0x7E000000 + 16, 2}}) {
+        EXPECT_EQ(compression_stream_encoder_create(COMPRESSION_BSZSTD,
+                                                    block_size, elem_size),
+                  nullptr)
+            << block_size << " " << elem_size;
+        EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 1000,
+                                           block_size, elem_size),
+                  COMPRESSION_ERROR)
+            << block_size << " " << elem_size;
+    }
+    EXPECT_EQ(compression_stream_bound(COMPRESSION_BSZSTD, 3, 128, 2),
+              COMPRESSION_ERROR);
+
+    std::mt19937_64 rng(43);
+    const auto data = to_bytes(random_values<uint16_t>(rng, 100));
+    auto encoder = create_bszstd_stream_encoder(128, 2);
+    ASSERT_TRUE(encoder);
+    std::string out(1024, '\0');
+    const auto start = [&](size_t dst_size, size_t src_size) {
+        return compression_stream_encoder_start(encoder.get(), out.data(),
+                                                dst_size, src_size);
+    };
+    const auto block = [&](size_t dst_size, size_t offset, size_t src_size) {
+        return compression_stream_encoder_block(encoder.get(), out.data() + 12,
+                                                dst_size, data.data() + offset,
+                                                src_size);
+    };
+
+    // Not started.
+    EXPECT_EQ(block(out.size(), 0, 128), COMPRESSION_ERROR);
+    // Destination too small for the header, size not a multiple of the
+    // element size.
+    EXPECT_EQ(start(11, data.size()), COMPRESSION_ERROR);
+    EXPECT_EQ(start(out.size(), data.size() - 1), COMPRESSION_ERROR);
+    EXPECT_EQ(block(out.size(), 0, 128), COMPRESSION_ERROR);
+
+    // Block size not the block size of the encoder, empty block.
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_EQ(block(out.size(), 0, 126), COMPRESSION_ERROR);
+    // An error ends the stream.
+    EXPECT_EQ(block(out.size(), 0, 128), COMPRESSION_ERROR);
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_EQ(block(out.size(), 0, 0), COMPRESSION_ERROR);
+
+    // Destination too small for the block header and for the block.
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_EQ(block(3, 0, 128), COMPRESSION_ERROR);
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_EQ(block(10, 0, 128), COMPRESSION_ERROR);
+
+    // The last block must hold the remaining data, nothing after it.
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_NE(block(out.size(), 0, 128), COMPRESSION_ERROR);
+    EXPECT_EQ(block(out.size(), 128, 128), COMPRESSION_ERROR);
+    ASSERT_EQ(start(out.size(), data.size()), 12u);
+    EXPECT_NE(block(out.size(), 0, 128), COMPRESSION_ERROR);
+    EXPECT_NE(block(out.size(), 128, data.size() - 128), COMPRESSION_ERROR);
+    EXPECT_EQ(block(out.size(), 0, 2), COMPRESSION_ERROR);
+
+    // The compressed block fits, the leftover bytes of the last block do not.
+    const auto odd = to_bytes(random_values<uint16_t>(rng, 9));
+    ASSERT_EQ(start(out.size(), odd.size()), 12u);
+    const size_t n = compression_stream_encoder_block(
+        encoder.get(), out.data() + 12, out.size() - 12, odd.data(), odd.size());
+    ASSERT_NE(n, COMPRESSION_ERROR);
+    ASSERT_EQ(start(out.size(), odd.size()), 12u);
+    EXPECT_EQ(compression_stream_encoder_block(encoder.get(), out.data() + 12,
+                                               n - 1, odd.data(), odd.size()),
               COMPRESSION_ERROR);
 }

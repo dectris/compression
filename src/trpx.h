@@ -14,6 +14,16 @@ size_t compression_decompress_buffer_trpx(char* dst,
                                           size_t src_size,
                                           size_t elem_size);
 
+/* Implementation of COMPRESSION_TRPX, see compression_compress_bound(). */
+size_t compression_compress_bound_trpx(size_t src_size, size_t elem_size);
+
+/* Implementation of COMPRESSION_TRPX, see compression_compress_buffer(). */
+size_t compression_compress_buffer_trpx(char* dst,
+                                        size_t dst_size,
+                                        const char* src,
+                                        size_t src_size,
+                                        size_t elem_size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif
