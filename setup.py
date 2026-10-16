@@ -53,7 +53,7 @@ class BuildExt(build_ext):
 
 setup(
     name="dectris-compression",
-    version="0.3.1",
+    version="0.4.0",
     description="DECTRIS compression algorithms",
     long_description=long_description,
     long_description_content_type="text/markdown",
