@@ -1,0 +1,48 @@
+From 6af34e1180cf111ead82e4930ea12e2485afd065 Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:53:08 +0200
+Subject: [PATCH] Add missing standard library includes
+
+Bitqueue.hpp uses std::memcpy and Concurrent.hpp uses std::max,
+std::tuple and std::unordered_map without including the corresponding
+headers. The code only compiles by accident through transitive includes
+of a particular standard library implementation and fails with others
+(e.g. libc++ or newer libstdc++ versions).
+---
+ include/Bitqueue.hpp   | 1 +
+ include/Concurrent.hpp | 3 +++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/include/Bitqueue.hpp b/include/Bitqueue.hpp
+index 162fa1a..9e698b5 100644
+--- a/include/Bitqueue.hpp
++++ b/include/Bitqueue.hpp
+@@ -10,6 +10,7 @@
+ 
+ #include "Shared_array.hpp"
+ #include <cassert>
++#include <cstring>
+ #include <bit>
+ #include <numeric>
+ #include <vector>
+diff --git a/include/Concurrent.hpp b/include/Concurrent.hpp
+index ea6277c..49621a3 100644
+--- a/include/Concurrent.hpp
++++ b/include/Concurrent.hpp
+@@ -1,6 +1,7 @@
+ #ifndef Concurrent_h
+ #define Concurrent_h
+ 
++#include <algorithm>
+ #include <iostream>
+ #include <queue>
+ #include <thread>
+@@ -12,6 +13,8 @@
+ #include <atomic>
+ #include <list>
+ #include <optional>
++#include <tuple>
++#include <unordered_map>
+ 
+ namespace jpa {
+ /**

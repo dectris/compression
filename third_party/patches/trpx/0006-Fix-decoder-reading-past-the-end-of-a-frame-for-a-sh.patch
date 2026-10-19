@@ -1,0 +1,61 @@
+From fb4dfb4f46ea15067338961607a9f767b98d4c64 Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:55:18 +0200
+Subject: [PATCH] Fix decoder reading past the end of a frame for a short last
+ weak block
+
+f_compress_weak_block packs a block of "weak" values (max < 7) into a
+single integer with `(max + 1) ^ n` states, where n is the number of
+values in the block. For the last block of a frame n can be smaller
+than the block size. The decoder however always used the full block
+size to compute the number of bits to pop, reading up to 2 bytes more
+than the encoder wrote. For the last block of a frame these bits lie
+beyond the frame buffer.
+
+Use the actual size of the data block in the decoder. In addition pad
+frames written in Terse_mode::Small_unsigned with 8 zero bytes so that
+unpatched decoders read zeros instead of garbage (or out of bounds).
+---
+ include/Terse.hpp | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index 72c9123..85eee1c 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -1235,7 +1235,7 @@ private:
+                 }
+             }
+         }
+-        terse_frame_size = static_cast<std::size_t>(bitqueue - terse_frame.data());
++        terse_frame_size = static_cast<std::size_t>(bitqueue - terse_frame.data()) + 8;
+         terse_frame_size = (terse_frame_size + 7) & ~std::size_t(7);
+         terse_frame.resize(terse_frame_size);
+         return terse_frame;
+@@ -1449,7 +1449,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+                 case 1: POP(T, 1, begin + static_cast<std::ptrdiff_t>(from), static_cast<std::ptrdiff_t>(to - from)); break;
+                 case 2: {
+                     std::span<T> data_block(begin + static_cast<std::ptrdiff_t>(from), begin + static_cast<std::ptrdiff_t>(to));
+-                    std::size_t val = bitqueue.pop<std::size_t>(f_most_significant_bit(f_integer_power(3, block) - 1));
++                    std::size_t val = bitqueue.pop<std::size_t>(f_most_significant_bit(f_integer_power(3, data_block.size()) - 1));
+                     for (std::size_t i = 0; i != data_block.size(); ++i) {
+                         data_block[i] = val % (3);
+                         val /= 3;
+@@ -1461,7 +1461,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+                 default: {
+                     if (max < 7) {
+                         std::span<T> data_block(begin + static_cast<std::ptrdiff_t>(from), begin + static_cast<std::ptrdiff_t>(to));
+-                        std::size_t const mult = f_integer_power(static_cast<std::size_t>(max) + 1, block) - 1;
++                        std::size_t const mult = f_integer_power(static_cast<std::size_t>(max) + 1, data_block.size()) - 1;
+                         std::size_t val = bitqueue.pop<std::size_t>(f_most_significant_bit(mult));
+                         for (std::size_t i = 0; i != data_block.size(); ++i) {
+                             auto [quot, rem] = std::div(static_cast<std::ptrdiff_t>(val), static_cast<std::ptrdiff_t>(max + 1));
+@@ -1496,7 +1496,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+             }
+             else {
+                 std::span<T> data_block(begin + static_cast<std::ptrdiff_t>(from), begin + static_cast<std::ptrdiff_t>(to));
+-                std::size_t const mult = f_integer_power(static_cast<std::size_t>(max) + 1, block) - 1;
++                std::size_t const mult = f_integer_power(static_cast<std::size_t>(max) + 1, data_block.size()) - 1;
+                 std::size_t val = bitqueue.pop<std::size_t>(f_most_significant_bit(mult));
+                 for (std::size_t i = 0; i != data_block.size(); ++i) {
+                     auto [quot, rem] = std::div(static_cast<std::ptrdiff_t>(val), static_cast<std::ptrdiff_t>(max + 1));

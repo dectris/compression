@@ -1,0 +1,28 @@
+From 46a2f72f55cc5e13d25185c093b87b570b2be1fb Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:55:33 +0200
+Subject: [PATCH] Fix reading frame metadata strings into the std::string
+ object
+
+When reading a Terse object from a stream, the metadata strings were
+read with `istream.read(reinterpret_cast<char*>(&d_metadata.back()), val)`,
+i.e. into the memory of the std::string object itself instead of its
+character buffer. For metadata longer than the size of a std::string
+object this overflows into the heap. Read into `data()` instead.
+---
+ include/Terse.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index 85eee1c..c8748ac 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -975,7 +975,7 @@ private:
+                 unsigned int val;
+                 while (meta_str >> val) {
+                     d_metadata.push_back(std::string(val, ' '));
+-                    istream.read(reinterpret_cast<char*>(&d_metadata.back()), val);
++                    istream.read(d_metadata.back().data(), val);
+                 }
+             }
+             d_terse_frames.resize(std::stoull(xmle.attribute("number_of_frames")));

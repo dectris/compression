@@ -1,0 +1,55 @@
+From 3318f398792352fd95e8d524a69e6a54ff1d993a Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:54:53 +0200
+Subject: [PATCH] Fix corrupt output for 32 bit data with saturated pixels
+
+Blocks containing saturated ("masked") pixels are encoded by
+f_compress_masked, which sets `prevmax` to the maximum value of T.
+For T = uint32_t, `previous_maxval + 1` then wraps around to 0 in
+f_compress_weak_block (for 8 and 16 bit types the addition is promoted
+to int and does not wrap), so a weak block with maxval 0 following a
+masked block was encoded with the "previous + 1" code that the decoder
+interprets differently. Guard the +1/-1 comparisons against wrap
+around.
+
+In addition f_compress_masked did not update `prevbits` after a weak
+block and `prevmax` after a strong block, while the decoder does. The
+encoder and decoder then disagree on the block header encoding of the
+next block, which produces corrupt data.
+---
+ include/Terse.hpp | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index de4af12..72c9123 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -1152,9 +1152,9 @@ private:
+             bitqueue.push_back<1>(0b1);
+         else if (previous_maxval == maxval)
+             bitqueue.push_back<2>(0b11);
+-        else if (previous_maxval + 1 == maxval)
++        else if (previous_maxval < maxval && previous_maxval + 1 == maxval)
+             bitqueue.push_back<2>(0b10);
+-        else if (maxval != 6 && previous_maxval - 1 == maxval)
++        else if (maxval != 6 && previous_maxval > maxval && previous_maxval - 1 == maxval)
+             bitqueue.push_back<2>(0b01);
+         else if (previous_maxval == 6 && maxval == 4)
+             bitqueue.push_back<2>(0b10);
+@@ -1270,10 +1270,14 @@ private:
+             std::transform(data + static_cast<std::ptrdiff_t>(from), data + static_cast<std::ptrdiff_t>(to), buffer.begin(), [](T val) {return val + 1;});
+             std::span<T const> unmasked(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(to - from));
+             max = std::ranges::max(unmasked);
+-            if (max < 7)
++            if (max < 7) {
+                 f_compress_weak_block(unmasked, bitqueue, max, prevmax);
+-            else
++                prevbits = 65;
++            }
++            else {
+                 f_compress_strong_block(unmasked, bitqueue, f_most_significant_bit(max), prevbits);
++                prevmax = max;
++            }
+             if (to != d_size) {
+                 std::span test_for_masked(data + static_cast<std::ptrdiff_t>(to), std::min(d_size - to, block));
+                 if (std::ranges::max(test_for_masked) != std::numeric_limits<T>::max()) {

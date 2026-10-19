@@ -1,0 +1,89 @@
+From 494f18bf95ff1031894ab0321c09b79a1a58ff95 Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Fri, 16 Oct 2026 10:38:01 +0200
+Subject: [PATCH] Add typename to dependent type names
+
+C++20 (P0634) makes `typename` optional in alias declarations, but Clang
+only implements this since version 16. Older Clang versions (e.g. Clang 14
+on Ubuntu 22.04) fail with "missing 'typename' prior to dependent type
+name". Spell out `typename`, which is valid in every C++ version.
+---
+ include/Terse.hpp | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/include/Terse.hpp b/include/Terse.hpp
+index c8748ac..228dc9a 100644
+--- a/include/Terse.hpp
++++ b/include/Terse.hpp
+@@ -1052,7 +1052,7 @@ private:
+     template <Terse_mode MODE, typename Iterator> requires ((MODE == Terse_mode::Signed || MODE == Terse_mode::Unsigned) &&
+                                                             std::integral<typename std::iterator_traits<Iterator>::value_type>)
+     std::vector<std::uint8_t> const f_compress(Iterator data) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         std::size_t terse_frame_size = static_cast<std::size_t>(d_size * sizeof(decltype(*data)) * 0.01) + 2 * (d_block * sizeof(decltype(*data)) + 32);
+         terse_frame_size = (terse_frame_size + 7) & ~std::size_t(7);
+         std::vector<std::uint8_t> terse_frame(terse_frame_size);
+@@ -1095,7 +1095,7 @@ private:
+ 
+     template <Terse_mode MODE, typename Iterator> requires (std::floating_point<typename std::iterator_traits<Iterator>::value_type>)
+     std::vector<std::uint8_t> const f_compress(Iterator data) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         std::uint8_t binary_precision = std::min(d_binary_precision, static_cast<std::uint8_t>(std::numeric_limits<T>::digits +1));
+         std::size_t terse_frame_size = static_cast<std::size_t>(d_size * sizeof(T) * 0.01) + 2 * (d_block * sizeof(decltype(*data)) + 32);
+         terse_frame_size = (terse_frame_size + 7) & ~std::size_t(7);
+@@ -1199,7 +1199,7 @@ private:
+     
+     template <Terse_mode MODE, typename Iterator> requires (MODE == Terse_mode::Small_unsigned)
+     std::vector<std::uint8_t> const f_compress(Iterator data) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         static_assert(std::is_unsigned_v<T>, "Cannot compress signed data with Terse_mode::small");
+         //std::size_t const block = std::min(d_block, 24ul);
+         std::size_t block = std::min(d_block, std::size_t(24));
+@@ -1330,7 +1330,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+     
+     template <std::size_t N, typename Iterator>
+     void f_prolix_signed(Iterator begin, std::size_t frame) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         Bitqueue_pop bitqueue(f_get_frame(frame));
+         uint8_t significant_bits = 0;
+         for (std::size_t from = 0; from < d_size; from += d_block) {
+@@ -1345,7 +1345,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+ 
+     template <std::size_t N, typename Iterator> 
+     void f_prolix_float(Iterator begin, std::size_t frame) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         Bitqueue_pop bitqueue(f_get_frame(frame));
+         bitqueue.pop<18, std::size_t>();
+         std::uint8_t const binary_precision = bitqueue.pop<6, std::uint8_t>();
+@@ -1380,7 +1380,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+     
+     template <std::size_t N, typename Iterator>
+     void f_prolix_unsigned(Iterator begin, std::size_t frame) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         Bitqueue_pop bitqueue(f_get_frame(frame));
+         bitqueue.pop<18, std::size_t>();
+         uint8_t significant_bits = 0;
+@@ -1434,7 +1434,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+     
+     template <std::size_t N, typename Iterator> requires std::integral<typename std::iterator_traits<Iterator>::value_type>
+     void f_prolix_small_unsigned(Iterator begin, std::size_t frame) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         //std::size_t block = std::min(d_block, 24ul);
+         std::size_t block = std::min(d_block, std::size_t(24));
+         Bitqueue_pop bitqueue(f_get_frame(frame));
+@@ -1480,7 +1480,7 @@ if (bitqueue.template pop<1,uint8_t>() == 0) {          \
+ 
+     template <std::size_t N, typename Iterator>
+     void f_prolix_small_unsigned_masked(Bitqueue_pop& bitqueue, Iterator begin, std::size_t& from, auto& max, auto& bits) noexcept {
+-        using T = std::iterator_traits<Iterator>::value_type;
++        using T = typename std::iterator_traits<Iterator>::value_type;
+         //std::size_t block = std::min(d_block, 24ul);
+         std::size_t block = std::min(d_block, std::size_t(24));
+         Unique_array<T> buffer(block);

@@ -1,0 +1,81 @@
+From c1e8be2e57c325a7bd388227f47a4b7bd1641d5d Mon Sep 17 00:00:00 2001
+From: Dirk Boye <dirk.boye@dectris.com>
+Date: Wed, 16 Sep 2026 11:53:31 +0200
+Subject: [PATCH] Create the global thread pool lazily
+
+The global thread pool of Concurrent is an `inline static` data member
+and is therefore constructed at program start-up. Its constructor spawns
+`hardware_concurrency() - 1` threads. As a consequence every binary that
+merely includes Concurrent.hpp (which Terse.hpp requires, also for the
+single threaded `Terse<void>`) starts a thread pool it may never use.
+
+Turn the member into a function local static so the pool is created on
+first use.
+---
+ include/Concurrent.hpp | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/include/Concurrent.hpp b/include/Concurrent.hpp
+index 49621a3..591f448 100644
+--- a/include/Concurrent.hpp
++++ b/include/Concurrent.hpp
+@@ -194,7 +194,7 @@ public:
+      */
+     Concurrent(Deg_of_parallelism dop) : d_dop(dop) {
+         if (d_dop > 0)
+-            d_unique_id = d_thread_pool.f_get_unique_id();
++            d_unique_id = d_thread_pool().f_get_unique_id();
+     }
+ 
+     /**
+@@ -220,7 +220,7 @@ public:
+                 return captured_func(std::forward<Args>(captured_args)...);
+         });
+         std::future<return_type> result = task->get_future();
+-        if (d_dop == 0.0 || !d_thread_pool.f_add_task(*this, [task]() { (*task)(); }))
++        if (d_dop == 0.0 || !d_thread_pool().f_add_task(*this, [task]() { (*task)(); }))
+             (*task)();  // Execute the task immediately
+         return result;
+     }
+@@ -243,12 +243,12 @@ public:
+     unsigned running_tasks() const {
+         unsigned task_count = 0;
+         {
+-            std::lock_guard<std::mutex> lock(d_thread_pool.d_mutex);
+-            for (const auto& task : d_thread_pool.d_task_queue)
++            std::lock_guard<std::mutex> lock(d_thread_pool().d_mutex);
++            for (const auto& task : d_thread_pool().d_task_queue)
+                 if (std::get<2>(task) == d_unique_id)
+                     ++task_count;
+-            if (d_thread_pool.d_running_tasks.count(d_unique_id))
+-                task_count += d_thread_pool.d_running_tasks.at(d_unique_id);
++            if (d_thread_pool().d_running_tasks.count(d_unique_id))
++                task_count += d_thread_pool().d_running_tasks.at(d_unique_id);
+         }
+         return task_count;
+     }
+@@ -265,7 +265,7 @@ private:
+     Deg_of_parallelism d_dop;
+     std::size_t d_unique_id = 0;
+ 
+-    inline static class c_Global_thread_pool {
++    class c_Global_thread_pool {
+         friend class Concurrent;
+ 
+         unsigned const d_max_threads = std::max(1u, std::thread::hardware_concurrency() - 1);
+@@ -361,7 +361,14 @@ private:
+                 }
+             }
+         }
+-    } d_thread_pool;
++    };
++
++    // The global thread pool is created on first use instead of at program
++    // start-up, so that merely including this header does not spawn threads.
++    static c_Global_thread_pool& d_thread_pool() {
++        static c_Global_thread_pool pool;
++        return pool;
++    }
+ };
+ 
+ /**

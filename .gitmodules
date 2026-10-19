@@ -4,3 +4,9 @@
 [submodule "third_party/lz4"]
 	path = third_party/lz4
 	url = https://github.com/lz4/lz4.git
+[submodule "third_party/zstd"]
+	path = third_party/zstd
+	url = https://github.com/facebook/zstd.git
+[submodule "third_party/trpx"]
+	path = third_party/trpx
+	url = https://github.com/senikm/trpx2.0.git

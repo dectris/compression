@@ -1,4 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,6 +16,12 @@ COPTS = select({
     ],
 })
 
+CXX_STD_COPTS = select({
+    "@platforms//os:windows": ["/std:c++20"],
+    "//conditions:default": ["-std=c++20"],
+})
+
+# Usage: `#include "dectris_compression/src/compression.h"`
 cc_library(
     name = "compression",
     srcs = [
@@ -23,12 +30,33 @@ cc_library(
     hdrs = [
         "src/compression.h",
     ],
-    copts = COPTS + [
-        "-Iexternal",
-    ],
+    copts = COPTS,
+    include_prefix = "dectris_compression",
     deps = [
+        ":trpx",
         "@bitshuffle",
         "@lz4",
+        "@zstd",
+    ],
+)
+
+# C++ implementation of COMPRESSION_TRPX.
+cc_library(
+    name = "trpx",
+    srcs = [
+        "src/trpx.cc",
+    ],
+    hdrs = [
+        "src/compression.h",
+        "src/trpx.h",
+    ],
+    copts = COPTS + CXX_STD_COPTS,
+    # Required by targets including the TRPX headers to suppress the warnings
+    # of the third party headers (-isystem, MSVC: /external:I).
+    features = ["external_include_paths"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "@trpx",
     ],
 )
 
@@ -37,13 +65,13 @@ cc_test(
     srcs = [
         "src/compression_test.cc",
     ],
-    copts = COPTS + select({
-        "@platforms//os:windows": [],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    copts = COPTS + CXX_STD_COPTS,
+    features = ["external_include_paths"],
     deps = [
         ":compression",
-        "@gtest",
-        "@gtest//:gtest_main",
+        "@bitshuffle",
+        "@googletest//:gtest_main",
+        "@trpx",
+        "@zstd",
     ],
 )
