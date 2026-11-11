@@ -1,0 +1,9 @@
+# The git submodules are only used by CMake and setup.py, the Bazel build
+# fetches its dependencies (see MODULE.bazel). Some submodules contain BUILD
+# files that would otherwise be packages of this repository.
+ignore_directories([
+    "third_party/bitshuffle",
+    "third_party/lz4",
+    "third_party/trpx",
+    "third_party/zstd",
+])

@@ -11,12 +11,23 @@ static int parse_algorithm(const char* identifier,
     } else if (strcmp(identifier, "lz4") == 0) {
         *algorithm = COMPRESSION_LZ4;
         return 1;
+    } else if (strcmp(identifier, "bszstd") == 0) {
+        *algorithm = COMPRESSION_BSZSTD;
+        return 1;
+    } else if (strcmp(identifier, "trpx") == 0) {
+        *algorithm = COMPRESSION_TRPX;
+        return 1;
     }
     return 0;
 }
 
 PyDoc_STRVAR(decompress__doc__, "\
-Decompress, returning a bytes object of the uncompressed data.");
+Decompress, returning a bytes object of the uncompressed data.\n\
+\n\
+Supported algorithms are 'bslz4', 'bszstd', 'lz4' and 'trpx'. 'elem_size' is\n\
+the size in bytes of one element of the uncompressed data. It is required by\n\
+'bslz4' and 'bszstd', optional for 'trpx' (must match the stream if given)\n\
+and ignored by 'lz4'.");
 
 static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
     static char* keywords[] = {"data", "algorithm", "elem_size", NULL};
@@ -43,7 +54,7 @@ static PyObject* decompress(PyObject* module, PyObject* args, PyObject* kw) {
         goto error;
     }
 
-    if (algorithm == COMPRESSION_BSLZ4) {
+    if (algorithm == COMPRESSION_BSLZ4 || algorithm == COMPRESSION_BSZSTD) {
         if (elem_size == 0) {
             PyErr_SetString(PyExc_ValueError,
                             "algorithm requires argument 'elem_size'");
